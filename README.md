@@ -31,4 +31,4 @@ Projelerin çalıştırılabilmesi için gerekli araçlar:
 # Kullanım
 1. Depoyu klonlayın:
    
-   git clone https://github.com/kullaniciadi/tiva-projeleri.git
+   git clone [https://github.com/kullaniciadi/tiva-projeleri.git](https://github.com/Furkan-0/ilerimikroislemci.git)
