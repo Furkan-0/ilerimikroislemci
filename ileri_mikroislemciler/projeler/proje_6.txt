@@ -1,0 +1,37 @@
+//Floating Point
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include <math.h>
+
+int main(void)
+{
+    SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);  //50 MHz
+
+    float a = 9.5, b = 4.2, c = -3.0;
+    float sum, difference, product, division;
+    float sine_a, cosine_b, tangent_c;
+    float sqrt_a, pow_a_b, exp_c;
+
+    sum = a + b;               // Toplama
+    difference = a - b;        // Çıkarma
+    product = a * b;           // Çarpma
+    quotient = a / b;          // Bölme
+
+    sine_a = sinf(a);          // a'nın sinüsü
+    cosine_b = cosf(b);        // b'nin kosinüsü
+    tangent_c = tanf(c);       // c'nin tanjantı
+
+    sqrt_a = sqrtf(a);         // a'nın karekökü
+    pow_a_b = powf(a, b);      // a'nın b'nci kuvveti
+    exp_c = expf(c);           // e üzeri c
+
+    while (1)
+    {
+
+    }
+
+    return 0;
+}

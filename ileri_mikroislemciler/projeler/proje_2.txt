@@ -1,0 +1,92 @@
+//LCD yazdırma
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+
+// LCD bağlantıları
+#define LCD_RS GPIO_PIN_0  // Register select (RS) -> PB0
+#define LCD_E  GPIO_PIN_1   // Enable (E) -> PB1
+#define LCD_D4 GPIO_PIN_4   // Data bit 4 (D4) -> PB4
+#define LCD_D5 GPIO_PIN_5   // Data bit 5 (D5) -> PB5
+#define LCD_D6 GPIO_PIN_6   // Data bit 6 (D6) -> PB6
+#define LCD_D7 GPIO_PIN_7   // Data bit 7 (D7) -> PB7
+
+void LCD_Command(unsigned char cmd);
+void LCD_Char(unsigned char data);
+void LCD_Init(void);
+void LCD_String(const char *str);
+void DelayMs(int n);
+
+int main(void) {
+   
+    SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB)) {}
+
+    GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, LCD_RS | LCD_E | LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7);
+
+    LCD_Init();
+
+    // LCD'ye "Furkan Ozturk" yaz
+    LCD_String("Furkan Ozturk");
+
+    while (1) {
+        
+    }
+}
+
+void LCD_Command(unsigned char cmd) {
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_RS, 0x00);
+
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, (cmd & 0xF0)); 
+
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E); 
+    DelayMs(1);
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0x00); 
+
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, ((cmd << 4) & 0xF0));
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E);
+    DelayMs(1);
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0x00);
+    DelayMs(2);
+}
+ 
+void LCD_Char(unsigned char data) {
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_RS, LCD_RS); 
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, (data & 0xF0));
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E); 
+    DelayMs(1);
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0x00); 
+
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, ((data << 4) & 0xF0));
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E);
+    DelayMs(1);
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0x00);
+
+    DelayMs(2);
+}
+
+// LCD'yi başlatma
+void LCD_Init(void) {
+    DelayMs(20);
+    LCD_Command(0x02);
+    LCD_Command(0x28);
+    LCD_Command(0x06);
+    LCD_Command(0x0C);
+    LCD_Command(0x01);
+    DelayMs(2);
+}
+
+void LCD_String(const char *str) {
+    while (*str) {
+        LCD_Char(*str++);
+    }
+}
+
+void DelayMs(int n) {
+    SysCtlDelay(SysCtlClockGet() / (1000 * 3) * n);
+}

@@ -1,0 +1,53 @@
+// spi
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_memmap.h"
+#include "inc/hw_types.h"
+#include "inc/hw_ssi.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/ssi.h"
+#include "inc/tm4c123gh6pm.h"
+
+void InitSPI(void) {
+    SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_XTAL_16MHZ | SYSCTL_OSC_MAIN);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_SSI0);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+    GPIOPinConfigure(GPIO_PA2_SSI0CLK);
+    GPIOPinConfigure(GPIO_PA5_SSI0TX);
+    GPIOPinTypeSSI(GPIO_PORTA_BASE, GPIO_PIN_2 | GPIO_PIN_5);
+    SSIConfigSetExpClk(SSI0_BASE, SysCtlClockGet(), SSI_FRF_MOTO_MODE_0, SSI_MODE_MASTER, 1000000, 8);
+    SSIEnable(SSI0_BASE);
+}
+
+void SPIWrite(uint8_t data) {
+    while (SSIBusy(SSI0_BASE));
+    SSIDataPut(SSI0_BASE, data);
+}
+
+void LCDInit(void) {
+    SPIWrite(0x01);
+    SysCtlDelay(SysCtlClockGet() / 100);
+    SPIWrite(0x38);
+    SPIWrite(0x0C);
+    SPIWrite(0x06);
+    SysCtlDelay(SysCtlClockGet() / 100);
+}
+
+void LCDWriteString(char *str) {
+    while (*str) {
+        SPIWrite(*str);
+        str++;
+    }
+}
+
+int main(void) {
+    InitSPI();
+    LCDInit();
+
+    while (1) {
+        LCDWriteString("furkan");
+        SysCtlDelay(SysCtlClockGet() / 2);
+    }
+}

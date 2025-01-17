@@ -1,0 +1,93 @@
+// saat ayarı
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/timer.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/sysctl.h"
+#include "utils/uartstdio.h"
+#include "lcd.h"
+
+#define SW1_PIN GPIO_PIN_4
+#define LCD_REFRESH_INTERVAL 1000000 
+
+volatile uint8_t hours = 0;
+volatile uint8_t minutes = 0;
+volatile uint8_t seconds = 0;
+
+void UpdateClock(void)
+{
+    seconds++;
+    if (seconds == 60)
+    {
+        seconds = 0;
+        minutes++;
+        if (minutes == 60)
+        {
+            minutes = 0;
+            hours++;
+            if (hours == 24)
+            {
+                hours = 0;
+            }
+        }
+    }
+}
+
+void DisplayTime(void)
+{
+    char timeStr[10];
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d:%02d", hours, minutes, seconds);
+    LCD_Clear();
+    LCD_SetCursor(0, 0);
+    LCD_Print(timeStr);
+}
+
+void ButtonPress(void)
+{
+    if (GPIOPinRead(GPIO_PORTF_BASE, SW1_PIN) == 0)
+    {
+        hours = (hours + 1) % 24;
+        SysCtlDelay(2000000);
+    }
+}
+
+int main(void)
+{
+    SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+
+    LCD_Init();
+    LCD_Clear();
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF)) {}
+    GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, SW1_PIN);
+    GPIOPadConfigSet(GPIO_PORTF_BASE, SW1_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_TIMER0)) {}
+    TimerConfigure(TIMER0_BASE, TIMER_CFG_A_PERIODIC);
+    TimerLoadSet(TIMER0_BASE, TIMER_A, LCD_REFRESH_INTERVAL);
+    TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    IntEnable(INT_TIMER0A);
+
+    IntMasterEnable();
+
+    while (1)
+    {
+        ButtonPress();
+
+        if (TimerIntStatus(TIMER0_BASE, false) & TIMER_TIMA_TIMEOUT)
+        {
+            TimerIntClear(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+            UpdateClock();
+            DisplayTime();
+        }
+    }
+}

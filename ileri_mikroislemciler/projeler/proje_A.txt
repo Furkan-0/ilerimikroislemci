@@ -1,0 +1,32 @@
+// kayan yazı fonksiyon kısmı
+
+int main(void) {
+    // Clock ayarları
+    SysCtlClockSet(SYSCTL_SYSDIV_5 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+
+    // Port B'yi başlat
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB)) {}
+
+    // Port B'deki pinleri çıkış yap
+    GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, LCD_RS | LCD_E | LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7);
+
+    // LCD'yi başlat
+    LCD_Init();
+
+    while (1) {
+        // LCD'yi temizle
+        LCD_Command(0x01);
+        DelayMs(2); // Ekran temizlendikten sonra kısa bir gecikme
+
+        // "Furkan" ismini karakter karakter yazdır
+        const char *name = "furkan_ozturk";
+        int i;
+        for (i = 0; name[i] != '\0'; i++) {
+            LCD_Char(name[i]); // Her bir karakteri yazdır
+            DelayMs(250);      // 0.25 saniye (250 ms) bekle
+        }
+
+        DelayMs(750); // Bir döngü tamamlandıktan sonra kısa bir bekleme süresi
+    }
+}

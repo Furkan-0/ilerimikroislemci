@@ -1,0 +1,65 @@
+// sw1 ile delay süresi artırma
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/gpio.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/sysctl.h"
+
+#define LED_PIN GPIO_PIN_1 
+#define SW1_PIN GPIO_PIN_4 
+
+uint32_t delayTime = 5000000;
+
+void LED_Init();
+void Button_Init();
+void Delay(uint32_t time);
+
+int main(void)
+{
+    SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+
+    LED_Init();
+    Button_Init();
+
+    while (1)
+    {
+        GPIOPinWrite(GPIO_PORTF_BASE, LED_PIN, LED_PIN);
+        Delay(delayTime);
+        GPIOPinWrite(GPIO_PORTF_BASE, LED_PIN, 0);
+        Delay(delayTime);
+
+        if (GPIOPinRead(GPIO_PORTF_BASE, SW1_PIN) == 0)
+        {
+            SysCtlDelay(2000000);
+            delayTime += 5000000;
+        }
+    }
+}
+
+void LED_Init()
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF)) {}
+
+    GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE, LED_PIN);
+}
+
+void Button_Init()
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOF)) {}
+
+    GPIOPinTypeGPIOInput(GPIO_PORTF_BASE, SW1_PIN);
+    GPIOPadConfigSet(GPIO_PORTF_BASE, SW1_PIN, GPIO_STRENGTH_2MA, GPIO_PIN_TYPE_STD);
+}
+
+void Delay(uint32_t time)
+{
+    SysCtlDelay(time);
+}

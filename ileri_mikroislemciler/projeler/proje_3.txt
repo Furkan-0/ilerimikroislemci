@@ -1,0 +1,139 @@
+// Sayac Kodu
+
+
+#include "stdint.h"
+#include "stdbool.h"
+#include "inc/hw_types.h"
+#include "inc/hw_gpio.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/timer.h"
+#include "driverlib/gpio.h"
+#include "driverlib/gpio.c"
+#include "inc/hw_memmap.h"
+#include "inc/tm4c123gh6pm.h"
+
+
+#define LCDPORT GPIO_PORTB_BASE
+#define RS      GPIO_PIN_0
+#define E       GPIO_PIN_1
+#define D4      GPIO_PIN_4
+#define D5      GPIO_PIN_5
+#define D6      GPIO_PIN_6
+#define D7      GPIO_PIN_7
+
+void LCD_ILK_AYARLAR() {
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+    GPIOPinTypeGPIOOutput(LCDPORT, 0xFF); // 8 bit hepsi çıkış
+
+    SysCtlDelay(200000);
+    LCD_KOMUT(0x02); // 4 bit modu
+    SysCtlDelay(200000);
+    LCD_KOMUT(0x28); // 2 satır, 5x7 matrix
+    SysCtlDelay(200000);
+    LCD_KOMUT(0x0C); // Ekranı aç, imleci gizle
+    SysCtlDelay(200000);
+    LCD_KOMUT(0x06); // Imlç sağa kay
+    SysCtlDelay(200000);
+    LCD_KOMUT(0x01); // Ekranı temizle
+    SysCtlDelay(200000);
+}
+
+void LCD_KOMUT(unsigned char cmd) {
+    GPIOPinWrite(LCDPORT, D4 | D5 | D6 | D7, (cmd & 0xF0));
+    GPIOPinWrite(LCDPORT, RS, 0); // Komut modu
+    GPIOPinWrite(LCDPORT, E, 2); // Enable sinyalini yükselt
+    SysCtlDelay(50000);
+    GPIOPinWrite(LCDPORT, E, 0); // Enable sinyalini düşür
+    SysCtlDelay(50000);
+
+    GPIOPinWrite(LCDPORT, D4 | D5 | D6 | D7, (cmd & 0x0F) << 4);
+    GPIOPinWrite(LCDPORT, RS, 0); // Komut modu
+    GPIOPinWrite(LCDPORT, E, 2); // Enable sinyalini yükselt
+    SysCtlDelay(10);
+    GPIOPinWrite(LCDPORT, E, 0); // Enable sinyalini düşür
+    SysCtlDelay(50000);
+}
+
+void LCD_YAZ(unsigned char data) {
+    GPIOPinWrite(LCDPORT, RS, 1); // Veri modu
+    GPIOPinWrite(LCDPORT, D4 | D5 | D6 | D7, (data & 0xF0));
+    GPIOPinWrite(LCDPORT, E, 2); // Enable sinyalini yükselt
+    SysCtlDelay(200000);
+    GPIOPinWrite(LCDPORT, E, 0); // Enable sinyalini düşür
+    SysCtlDelay(50000);
+
+    GPIOPinWrite(LCDPORT, RS, 1); // Veri modu
+    GPIOPinWrite(LCDPORT, D4 | D5 | D6 | D7, (data & 0x0F) << 4);
+    GPIOPinWrite(LCDPORT, E, 2); // Enable sinyalini yükselt
+    SysCtlDelay(200000);
+    GPIOPinWrite(LCDPORT, E, 0); // Enable sinyalini düşür
+    SysCtlDelay(200000);
+}
+
+void yazdir(int saat, int dakika, int saniye) {
+    LCD_KOMUT(0x80); // 1. satırın başlangıcı
+    LCD_YAZ('0' + saat / 10); // 10'ların basamağı
+    LCD_YAZ('0' + saat % 10); // 1'lerin basamağı
+    LCD_YAZ(':');
+    LCD_YAZ('0' + dakika / 10); // 10'ların basamağı
+    LCD_YAZ('0' + dakika % 10); // 1'lerin basamağı
+    LCD_YAZ(':');
+    LCD_YAZ('0' + saniye / 10); // 10'ların basamağı
+    LCD_YAZ('0' + saniye % 10); // 1'lerin basamağı
+}
+
+int saat =0, dakika=0, saniye=0;
+void kesme()
+{
+
+
+saniye=saniye+1;
+
+
+
+
+
+    TimerIntClear(TIMER0_BASE, TIMER_A);
+}
+
+int main(void) {
+                SysCtlClockSet(SYSCTL_SYSDIV_5|SYSCTL_USE_PLL|SYSCTL_XTAL_16MHZ|SYSCTL_OSC_MAIN);
+                IntMasterEnable();
+                IntEnable(INT_TIMER0A);
+                SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOF);
+                SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+                GPIOPinTypeGPIOOutput(GPIO_PORTF_BASE,GPIO_PIN_1|GPIO_PIN_2|GPIO_PIN_3); // pin 1, 2, 3 output
+                TimerConfigure(TIMER0_BASE, TIMER_CFG_A_PERIODIC);
+                TimerLoadSet(TIMER0_BASE,TIMER_A, SysCtlClockGet()-1); //40mhz -1 0 var çünkğ 41 sayar
+                TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+                TimerIntRegister(TIMER0_BASE, TIMER_A, kesme);
+                TimerEnable(TIMER0_BASE,TIMER_A); //stb tr0
+
+    LCD_ILK_AYARLAR();
+
+
+
+    while (1) {
+
+
+
+               if (saniye >= 60) {
+                   saniye = 0;
+                   dakika = dakika + 1;
+
+                   if (dakika >= 60) {
+                       dakika = 0;
+                       saat = saat + 1;
+
+                       if (saat >= 24) {
+                           saat = 0;
+                           dakika = 0;
+                           saniye = 0;
+                       }
+                   }
+               }
+
+               yazdir(saat, dakika, saniye);
+           }
+       }

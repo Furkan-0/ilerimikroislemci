@@ -1,0 +1,190 @@
+// seriport
+
+//Seriport haberleşmesindeki CSS (C) kodu
+
+#include <stdint.h>
+#include <stdbool.h>
+#include "inc/hw_types.h"
+#include "inc/hw_memmap.h"
+#include "driverlib/sysctl.h"
+#include "driverlib/gpio.h"
+#include "driverlib/pin_map.h"
+#include "driverlib/uart.h"
+#include "driverlib/timer.h"
+#include "inc/tm4c123gh6pm.h"
+
+// LCD Bağlantıları
+#define LCD_RS    GPIO_PIN_0  // RS pin
+#define LCD_E     GPIO_PIN_1  // Enable pin
+#define LCD_D4    GPIO_PIN_4  // D4 pin
+#define LCD_D5    GPIO_PIN_5  // D5 pin
+#define LCD_D6    GPIO_PIN_6  // D6 pin
+#define LCD_D7    GPIO_PIN_7  // D7 pin
+
+// Saat verisi
+int saat = 0, dakika = 0, saniye = 0;
+
+// LCD Fonksiyonları
+void LCD_SendCommand(uint8_t command);
+void LCD_SendData(uint8_t data);
+void LCD_Init();
+
+// UART Fonksiyonları
+void UART_Init();
+char UART_ReceiveData();
+
+// Timer Fonksiyonları
+void Timer_Init();
+void Timer_ISR();
+
+// Ana Fonksiyon
+int main(void)
+{
+    // Sistem saatini ayarlıyoruz
+    SysCtlClockSet(SYSCTL_SYSDIV_4 | SYSCTL_USE_PLL | SYSCTL_OSC_MAIN | SYSCTL_XTAL_16MHZ);
+
+    // LCD ve UART başlatma
+    LCD_Init();
+    UART_Init();
+    Timer_Init();
+
+    while (1) {
+        // UART üzerinden saat verisini alıyoruz
+        char saatStr[9];  // Saat formatı "HH:MM:SS"
+        int i = 0;
+
+        // UART'dan saat verisini al
+        while (i < 8) {
+            saatStr[i] = UART_ReceiveData();
+            i++;
+        }
+        saatStr[8] = '\0';  // Null terminator
+
+        // Saat verisini saat, dakika, saniye olarak ayırıyoruz
+        sscanf(saatStr, "%2d:%2d:%2d", &saat, &dakika, &saniye);
+
+        // LCD'ye saati yazdırıyoruz
+        yazdir(saat, dakika, saniye);
+
+        // Saat her saniye artacak
+        SysCtlDelay(SysCtlClockGet() / 3); // 1 saniye bekleme (yaklaşık)
+        saniye++;
+
+        if (saniye >= 60) {
+            saniye = 0;
+            dakika++;
+            if (dakika >= 60) {
+                dakika = 0;
+                saat++;
+                if (saat >= 24) {
+                    saat = 0;
+                }
+            }
+        }
+    }
+}
+
+// LCD İnit Fonksiyonu
+void LCD_Init()
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOB);
+    while (!SysCtlPeripheralReady(SYSCTL_PERIPH_GPIOB)) {}
+
+    GPIOPinTypeGPIOOutput(GPIO_PORTB_BASE, LCD_RS | LCD_E | LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7);
+
+    SysCtlDelay(200000);  // Başlatmadan önce bekle
+
+    LCD_SendCommand(0x02);  // 4-bit modda başlat
+    LCD_SendCommand(0x28);  // 2 satır, 5x7 font
+    LCD_SendCommand(0x06);  // Cursor hareketi sağa
+    LCD_SendCommand(0x0C);  // Ekran aç, cursor kapalı
+    LCD_SendCommand(0x01);  // Ekranı temizle
+}
+
+// LCD Komut Gönderme
+void LCD_SendCommand(uint8_t command)
+{
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_RS, 0);  // RS = 0 (Komut modu)
+
+    // İlk yarım bayt
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, (command & 0xF0));
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E);  // Enable aktif
+    SysCtlDelay(2000);  // Bekle
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0);  // Enable pasif
+
+    // İkinci yarım bayt
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, (command << 4));
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E);  // Enable aktif
+    SysCtlDelay(2000);  // Bekle
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0);  // Enable pasif
+}
+
+// LCD'ye veri gönderme
+void LCD_SendData(uint8_t data)
+{
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_RS, LCD_RS);  // RS = 1 (Veri modu)
+
+    // İlk yarım bayt
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, (data & 0xF0));
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E);  // Enable aktif
+    SysCtlDelay(2000);  // Bekle
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0);  // Enable pasif
+
+    // İkinci yarım bayt
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_D4 | LCD_D5 | LCD_D6 | LCD_D7, (data << 4));
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, LCD_E);  // Enable aktif
+    SysCtlDelay(2000);  // Bekle
+    GPIOPinWrite(GPIO_PORTB_BASE, LCD_E, 0);  // Enable pasif
+}
+
+// UART Başlatma
+void UART_Init()
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_UART0);
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_GPIOA);
+
+    GPIOPinConfigure(GPIO_PA0_U0RX);
+    GPIOPinConfigure(GPIO_PA1_U0TX);
+    GPIOPinTypeUART(GPIO_PORTA_BASE, GPIO_PIN_0 | GPIO_PIN_1);
+
+    UARTConfigSetExpClk(UART0_BASE, SysCtlClockGet(), 115200, UART_CONFIG_WLEN_8 | UART_CONFIG_STOP_ONE | UART_CONFIG_PAR_NONE);
+    UARTEnable(UART0_BASE);
+}
+
+// UART'tan veri alma
+char UART_ReceiveData()
+{
+    while (UARTCharsAvail(UART0_BASE) == 0) {}
+    return UARTCharGet(UART0_BASE);
+}
+
+// Timer Başlatma
+void Timer_Init()
+{
+    SysCtlPeripheralEnable(SYSCTL_PERIPH_TIMER0);
+    TimerConfigure(TIMER0_BASE, TIMER_CFG_A_PERIODIC);
+    TimerLoadSet(TIMER0_BASE, TIMER_A, SysCtlClockGet() - 1);
+    TimerIntEnable(TIMER0_BASE, TIMER_TIMA_TIMEOUT);
+    TimerIntRegister(TIMER0_BASE, TIMER_A, Timer_ISR);
+    TimerEnable(TIMER0_BASE, TIMER_A);
+}
+
+// Timer Kesme Fonksiyonu
+void Timer_ISR()
+{
+    TimerIntClear(TIMER0_BASE, TIMER_A);
+}
+
+// LCD'ye saati yazdırma
+void yazdir(int saat, int dakika, int saniye)
+{
+    LCD_SendCommand(0x80); // 1. satırın başlangıcı
+    LCD_SendData('0' + saat / 10); // 10'ların basamağı
+    LCD_SendData('0' + saat % 10); // 1'lerin basamağı
+    LCD_SendData(':');
+    LCD_SendData('0' + dakika / 10); // 10'ların basamağı
+    LCD_SendData('0' + dakika % 10); // 1'lerin basamağı
+    LCD_SendData(':');
+    LCD_SendData('0' + saniye / 10); // 10'ların basamağı
+    LCD_SendData('0' + saniye % 10); // 1'lerin basamağı
+}
